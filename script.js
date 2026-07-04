@@ -19,7 +19,45 @@ function nav(v){state.history.push(state.view);state.view=v;render()} function b
 function stats(){const ans=learn.answers, today=ans.filter(a=>a.date===TODAY), correct=ans.filter(a=>a.correct).length;return{total:ans.length,correct,rate:pct(correct,ans.length),today:today.length,todayRate:pct(today.filter(a=>a.correct).length,today.length),read:pct(learn.completedChapters.length,content.textbook.length)}}
 function weakness(){const m={};learn.answers.filter(a=>!a.correct).forEach(a=>m[a.category]=(m[a.category]||0)+1);return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,3)}
 function render(){try{({home, textbook, quiz, categoryQuiz, exam, wrong, glossary, records, manage, settings:settingsView}[state.view]||home)()}catch(e){$("app").innerHTML=`<section class=card><h2>エラー</h2><p>${esc(e.message)}</p><button onclick="nav('home')">ホームへ</button></section>`}}
-function home(){const s=stats(), weak=weakness();const cards=[["textbook","📚","教科書で学ぶ","10章の体系教材"],["quiz","✅","一問一答クイズ","即時採点と詳細解説"],["categoryQuiz","🎯","分野別クイズ","カテゴリ・難易度指定"],["exam","⏱️","模擬試験","スタート後に時間計測"],["wrong","🧠","間違えた問題","弱点復習"],["glossary","🔎","用語集","50語以上"],["records","📈","学習記録","進捗と弱点"],["manage","🛠️","問題管理","追加・編集・レビュー"],["settings","⚙️","設定","JSON入出力"]];$("app").innerHTML=`<section class=card><h2>今日の学習状況</h2><div class=stats><div class=stat>今日の回答<b>${s.today}</b></div><div class=stat>総進捗<b>${s.read}%</b></div><div class=stat>正答率<b>${s.rate}%</b></div><div class=stat>連続学習日数<b>${learn.streak}</b></div><div class=stat>今日の目標<b>${settings.dailyGoal}問</b></div></div><p>苦手分野トップ3: ${weak.map(w=>`${w[0]}(${w[1]})`).join("、")||"まだありません"}</p><button onclick="startQuiz()">学習再開</button></section><section class=grid>${cards.map(x=>`<button class="card menu-card" onclick="nav('${x[0]}')"><span class=icon aria-hidden=true>${x[1]}</span><b>${x[2]}</b><small>${x[3]}</small></button>`).join("")}</section>`}
+function home(){
+  const s = stats(), weak = weakness();
+  const cards = [
+    ["textbook","📚","教科書で学ぶ","10章の体系教材"],
+    ["quiz","✅","一問一答クイズ","即時採点と詳細解説"],
+    ["categoryQuiz","🎯","分野別クイズ","カテゴリ・難易度指定"],
+    ["exam","⏱️","模擬試験","タイマー付き本番形式"],
+    ["wrong","🧠","間違えた問題","弱点復習"],
+    ["glossary","🔎","用語集","50語以上"],
+    ["records","📈","学習記録","進捗と弱点"],
+    ["manage","🛠️","問題管理","追加・編集・レビュー"],
+    ["settings","⚙️","設定","JSON入出力"]
+  ];
+
+  $("app").innerHTML = `
+    <section class=card>
+      <h2>今日の学習状況</h2>
+      <div class=stats>
+        <div class=stat>今日の回答<b>${s.today}</b></div>
+        <div class=stat>総進捗<b>${s.read}%</b></div>
+        <div class=stat>正答率<b>${s.rate}%</b></div>
+        <div class=stat>連続学習日数<b>${learn.streak}</b></div>
+        <div class=stat>今日の目標<b>${settings.dailyGoal}問</b></div>
+      </div>
+      <p>苦手分野トップ3: ${weak.map(w=>`${w[0]}(${w[1]})`).join("、") || "まだありません"}</p>
+      <button onclick="startQuiz()">学習再開</button>
+    </section>
+
+    <section class=grid>
+      ${cards.map(x=>`
+        <button class="card menu-card" onclick="nav('${x[0]}')">
+          <span class=icon aria-hidden=true>${x[1]}</span>
+          <b>${x[2]}</b>
+          <small>${x[3]}</small>
+        </button>
+      `).join("")}
+    </section>
+  `;
+}
 function textbook(){let ch=content.textbook.find(c=>c.id===state.selectedChapter)||content.textbook[0];state.selectedChapter=ch.id;$("app").innerHTML=`<div class=two><aside class=panel><input id=tsearch placeholder="章・キーワード検索" oninput="textbook()"><div class=list>${content.textbook.filter(c=>JSON.stringify(c).includes($("tsearch")?.value||"")).map(c=>`<div class="item ${c.id===ch.id?'active':''}" onclick="state.selectedChapter='${c.id}';textbook()">${esc(c.title)} ${learn.completedChapters.includes(c.id)?'✅':''}</div>`).join("")}</div></aside><section class=card><h2>${esc(ch.title)}</h2><p>${esc(ch.summary)}</p>${ch.sections.map(s=>`<h3>${esc(s.heading)}</h3><p>${esc(s.body)}</p>`).join("")}<h3>重要用語</h3>${ch.keyTerms.map(t=>`<span class=badge>${esc(t)}</span>`).join("")}<h3>試験で問われやすいポイント</h3><ul>${ch.examTips.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><h3>間違えやすいポイント</h3><ul>${ch.commonMistakes.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><button onclick="completeChapter('${ch.id}')">読了にする</button> <button class=secondary onclick="startQuiz('${ch.title}')">関連問題へ</button> <button class=light onclick="nav('glossary')">関連用語へ</button><h3>章末ミニクイズ</h3>${ch.miniQuizIds.map(id=>`<button class=choice onclick="state.selectedQuestion='${id}';startQuiz(null,'${id}')">${id}: ${esc(byId(id)?.question||'')}</button>`).join("")}</section></div>`}
 function completeChapter(id){if(!learn.completedChapters.includes(id))learn.completedChapters.push(id);persist();textbook()}
 function startQuiz(cat=null,id=null){const pool=id?[byId(id)]:activeQ().filter(q=>!cat||q.category===cat);state.quiz={pool:settings.shuffle?pool.sort(()=>Math.random()-.5):pool,idx:0,correct:0,streak:0,answered:false};nav("quiz")}
@@ -29,10 +67,133 @@ function nextQuiz(){state.quiz.idx++;state.quiz.answered=false;quiz()} function 
 function record(q,correct,choice){learn.answers.push({id:q.id,category:q.category,difficulty:q.difficulty,correct,choice,date:TODAY,time:Date.now()}); if(!correct){learn.wrong[q.id]=learn.wrong[q.id]||{count:0,streak:0,mastered:false};learn.wrong[q.id].count++;learn.wrong[q.id].streak=0}else if(learn.wrong[q.id]){learn.wrong[q.id].streak++;if(learn.wrong[q.id].streak>=3)learn.wrong[q.id].mastered=true} }
 function categoryQuiz(){const cats=[...new Set(activeQ().map(q=>q.category))];$("app").innerHTML=`<section class=card><h2>分野別クイズ</h2><div class=toolbar><label>カテゴリ<select id=cqcat>${cats.map(c=>`<option>${esc(c)}</option>`)}</select></label><label>サブカテゴリ<input id=cqsub placeholder="任意"></label><label>難易度<select id=cqdiff><option value="">全て</option><option>basic</option><option>standard</option><option>advanced</option></select></label><label>問題数<select id=cqnum><option>5</option><option>10</option><option>20</option><option value="all">全問</option></select></label></div><button onclick="startCategoryQuiz()">ランダム出題開始（苦手優先）</button></section>`}
 function startCategoryQuiz(){let p=activeQ().filter(q=>q.category===$("cqcat").value&&(!$("cqsub").value||q.subcategory.includes($("cqsub").value))&&(!$("cqdiff").value||q.difficulty===$("cqdiff").value));p.sort((a,b)=>(learn.wrong[b.id]?.count||0)-(learn.wrong[a.id]?.count||0)||Math.random()-.5);let n=$("cqnum").value==="all"?p.length:+$("cqnum").value;state.quiz={pool:p.slice(0,n),idx:0,correct:0,streak:0,answered:false};nav("quiz")}
-function exam(){if(!state.exam){$("app").innerHTML=`<section class=card><h2>模擬試験</h2><p>スタートボタンを押すと問題セットを作成し、制限時間のカウントダウンを開始します。問題数が不足する場合は登録済み問題数に自動調整します。</p><div class=stats><div class=stat>オンライン試験想定<b>100分</b><span>145問</span></div><div class=stat>会場試験想定<b>120分</b><span>145問</span></div><div class=stat>現在の設定<b>${settings.examMinutes}分</b><span>${Math.min(settings.examCount,activeQ().length)}問</span></div></div><div class=toolbar><button onclick="startExam('online')">オンライン想定でスタート</button><button class=secondary onclick="startExam('venue')">会場想定でスタート</button><button class=light onclick="resumeExam()">途中保存から再開</button></div></section>`;return} const e=state.exam, remain=Math.max(0,e.end-Date.now()), mm=String(Math.floor(remain/60000)).padStart(2,'0'), ss=String(Math.floor(remain%60000/1000)).padStart(2,'0');if(remain===0){finishExam();return}$("app").innerHTML=`<section class=card><h2>模擬試験</h2><p><b>残り時間 ${mm}:${ss}</b> / 制限時間 ${e.minutes}分 / 未回答 ${e.pool.length-Object.keys(e.answers).length}</p><div class=progress><div class=bar style="width:${Math.max(0,Math.round(remain/(e.minutes*60000)*100))}%"></div></div><div class=exam-nav>${e.pool.map((q,i)=>`<button class="${e.marks[q.id]?'marked':''}" onclick="showExamQ(${i})">${i+1}</button>`).join("")}</div><div id=examQ></div><div class=toolbar><button onclick="save(LS.learn,learn);save('gdojo.exam.resume',state.exam);alert('途中保存しました')">途中保存</button><button class=danger onclick="finishExam()">採点する</button><button class=light onclick="state.exam=null;exam()">中止して設定へ</button></div></section>`;showExamQ(e.current||0);clearInterval(state.examTimer);state.examTimer=setInterval(()=>state.view==='exam'&&state.exam?exam():clearInterval(state.examTimer),1000)}
-function startExam(type='online'){let mins=type==='venue'?120:100, count=145;settings.examMinutes=mins;settings.examCount=count;let pool=activeQ().sort(()=>Math.random()-.5).slice(0,Math.min(count,activeQ().length));state.exam={pool,answers:{},marks:{},start:Date.now(),end:Date.now()+mins*60000,minutes:mins,current:0,type};persist();exam()}
-function resumeExam(){state.exam=load('gdojo.exam.resume',null);if(state.exam){state.exam.end=state.exam.end||Date.now()+state.exam.minutes*60000;exam()}else alert('途中保存データがありません')}
-function showExamQ(i){state.exam.current=i;const q=state.exam.pool[i];$("examQ").innerHTML=`<h3>${i+1}. ${esc(q.question)}</h3>${q.choices.map((c,n)=>`<button class=choice onclick="state.exam.answers['${q.id}']=${n};showExamQ(${i})">${state.exam.answers[q.id]===n?'●':'○'} ${n+1}. ${esc(c)}</button>`).join("")}<button class=light onclick="state.exam.marks['${q.id}']=!state.exam.marks['${q.id}'];exam()">後で見直す</button>`}
+function exam(){
+  if(!state.exam){
+    $("app").innerHTML = `
+      <section class=card>
+        <h2>模擬試験</h2>
+        <p>スタートボタンを押すと問題セットを作成し、制限時間のカウントダウンを開始します。問題数が不足する場合は登録済み問題数に自動調整します。</p>
+
+        <div class=stats>
+          <div class=stat>オンライン試験想定<b>100分</b><span>145問</span></div>
+          <div class=stat>会場試験想定<b>120分</b><span>145問</span></div>
+          <div class=stat>現在の設定<b>${settings.examMinutes}分</b><span>${Math.min(settings.examCount, activeQ().length)}問</span></div>
+        </div>
+
+        <div class=toolbar>
+          <button onclick="startExam('online')">オンライン想定でスタート</button>
+          <button class=secondary onclick="startExam('venue')">会場想定でスタート</button>
+          <button class=light onclick="resumeExam()">途中保存から再開</button>
+        </div>
+      </section>
+    `;
+    return;
+  }
+
+  const e = state.exam;
+  const remain = Math.max(0, e.end - Date.now());
+  const mm = String(Math.floor(remain / 60000)).padStart(2, "0");
+  const ss = String(Math.floor((remain % 60000) / 1000)).padStart(2, "0");
+
+  if(remain === 0){
+    finishExam();
+    return;
+  }
+
+  $("app").innerHTML = `
+    <section class=card>
+      <h2>模擬試験</h2>
+      <p><b>残り時間 ${mm}:${ss}</b> / 制限時間 ${e.minutes}分 / 未回答 ${e.pool.length - Object.keys(e.answers).length}</p>
+
+      <div class=progress>
+        <div class=bar style="width:${Math.max(0, Math.round(remain / (e.minutes * 60000) * 100))}%"></div>
+      </div>
+
+      <div class=exam-nav>
+        ${e.pool.map((q,i)=>`
+          <button class="${e.marks[q.id] ? "marked" : ""}" onclick="showExamQ(${i})">${i+1}</button>
+        `).join("")}
+      </div>
+
+      <div id=examQ></div>
+
+      <div class=toolbar>
+        <button onclick="save(LS.learn, learn); save('gdojo.exam.resume', state.exam); alert('途中保存しました')">途中保存</button>
+        <button class=danger onclick="finishExam()">採点する</button>
+        <button class=light onclick="state.exam=null; exam()">中止して設定へ</button>
+      </div>
+    </section>
+  `;
+
+  showExamQ(e.current || 0);
+
+  clearInterval(state.examTimer);
+  state.examTimer = setInterval(()=>{
+    if(state.view === "exam" && state.exam){
+      exam();
+    }else{
+      clearInterval(state.examTimer);
+    }
+  }, 1000);
+}
+
+function startExam(type = "online"){
+  const mins = type === "venue" ? 120 : 100;
+  const count = 145;
+  const questions = activeQ();
+
+  settings.examMinutes = mins;
+  settings.examCount = count;
+
+  const pool = questions
+    .sort(()=>Math.random() - 0.5)
+    .slice(0, Math.min(count, questions.length));
+
+  if(pool.length === 0){
+    alert("出題できる問題がありません。問題データを確認してください。");
+    return;
+  }
+
+  state.exam = {
+    pool,
+    answers: {},
+    marks: {},
+    start: Date.now(),
+    end: Date.now() + mins * 60000,
+    minutes: mins,
+    current: 0,
+    type
+  };
+
+  persist();
+  exam();
+}
+
+function resumeExam(){
+  state.exam = load("gdojo.exam.resume", null);
+
+  if(state.exam){
+    state.exam.end = state.exam.end || Date.now() + state.exam.minutes * 60000;
+    exam();
+  }else{
+    alert("途中保存データがありません");
+  }
+}
+
+function showExamQ(i){
+  state.exam.current = i;
+  const q = state.exam.pool[i];
+
+  $("examQ").innerHTML = `
+    <h3>${i+1}. ${esc(q.question)}</h3>
+    ${q.choices.map((c,n)=>`
+      <button class=choice onclick="state.exam.answers['${q.id}']=${n}; showExamQ(${i})">
+        ${state.exam.answers[q.id] === n ? "●" : "○"} ${n+1}. ${esc(c)}
+      </button>
+    `).join("")}
+    <button class=light onclick="state.exam.marks['${q.id}']=!state.exam.marks['${q.id}']; exam()">後で見直す</button>
+  `;
+}
 function finishExam(){const e=state.exam;let correct=0, cats={};e.pool.forEach(q=>{const ok=e.answers[q.id]===q.answer;correct+=ok?1:0;cats[q.category]=cats[q.category]||[0,0];cats[q.category][1]++; if(ok)cats[q.category][0]++; record(q,ok,e.answers[q.id])});learn.mockHistory.push({date:TODAY,count:e.pool.length,correct,rate:pct(correct,e.pool.length)});state.exam=null;persist();$("app").innerHTML=`<section class=card><h2>模擬試験結果</h2><p>正答率 ${pct(correct,e.pool.length)}% (${correct}/${e.pool.length})</p>${Object.entries(cats).map(([c,v])=>`<p>${c}: ${pct(v[0],v[1])}%</p>`).join("")}<p>復習すべき章: ${weakness().map(w=>w[0]).join("、")}</p></section>`}
 function wrong(){const ids=Object.keys(learn.wrong);$("app").innerHTML=`<section class=card><h2>間違えた問題</h2><label><input type=checkbox id=showMaster onchange="wrong()">克服済みも表示</label><div class=list>${ids.filter(id=>$("showMaster")?.checked||!learn.wrong[id].mastered).map(id=>{let q=byId(id),w=learn.wrong[id];return q?`<div class=item><b>${q.category}</b> 苦手度${w.count} 連続正解${w.streak} ${w.mastered?'✅克服':''}<p>${esc(q.question)}</p><button onclick="startQuiz(null,'${id}')">再挑戦</button><button class=light onclick="alert('${esc(q.explanation)}')">解説</button></div>`:""}).join("")}</div></section>`}
 function glossary(){let terms=content.glossary.filter(t=>t.enabled).sort((a,b)=>a.term.localeCompare(b.term,"ja"));$("app").innerHTML=`<section class=card><h2>用語集</h2><div class=toolbar><input id=gq placeholder="検索" oninput="glossary()"><select id=gcat onchange="glossary()"><option value="">全カテゴリ</option>${CATS.map(c=>`<option>${c}</option>`).join("")}</select></div><div class=grid>${terms.filter(t=>(!$("gq")?.value||JSON.stringify(t).includes($("gq").value))&&(!$("gcat")?.value||t.category===$("gcat").value)).map(t=>`<div class=card><h3>${esc(t.term)} ${learn.termFavorites.includes(t.id)?'★':''}</h3><p>${esc(t.description)}</p><p>${esc(t.detail)}</p><p><b>試験:</b>${esc(t.examPoint)}</p>${t.relatedTerms.map(r=>`<span class=badge>${esc(r)}</span>`).join("")}<button onclick="toggleList('termFavorites','${t.id}')">お気に入り</button></div>`).join("")}</div></section>`}
